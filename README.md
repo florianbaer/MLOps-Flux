@@ -189,7 +189,6 @@ kubectl logs -n airflow <scheduler-pod-name> -c git-sync
 ├── archive/
 │   └── argocd-application.yaml       # Previous ArgoCD configuration
 ├── git-ssh-secret.yaml               # SSH key for DAG repository
-├── values.yaml                       # Airflow configuration values (reference)
 ├── Chart.yaml                        # Helm chart metadata (optional)
 └── README.md                         # This file
 ```
@@ -243,7 +242,7 @@ spec:
 
 ### Modifying Configuration
 
-1. Edit `clusters/production/03-helmrelease.yaml` or `values.yaml`
+1. Edit `clusters/production/03-helmrelease.yaml`
 2. Commit and push changes to GitHub
 3. Flux automatically detects changes and reconciles within the interval period (default: 10 minutes)
 
