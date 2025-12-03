@@ -100,30 +100,6 @@ spec:
           cpu: 200m
           memory: 512Mi
 
-    # PostgreSQL database (using bundled chart)
-    # IMPORTANT: Create secret first: kubectl create secret generic airflow-postgresql --from-literal=postgres-password=password --from-literal=password=password -n airflow
-    postgresql: 
-      enabled: true
-      auth:
-        enablePostgresUser: true
-        username: "airflow"
-        database: "airflow"
-        existingSecret: "airflow-postgresql"
-        secretKeys:
-          adminPasswordKey: "postgres-password"
-          userPasswordKey: "password"
-      primary:
-        persistence:
-          enabled: true
-          size: 8Gi
-        resources:
-          limits:
-            cpu: 500m
-            memory: 1Gi
-          requests:
-            cpu: 250m
-            memory: 512Mi
-
     # Redis (required for CeleryExecutor, optional for KubernetesExecutor)
     redis:
       enabled: false  # Set to true if using CeleryExecutor
