@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-system/
+  - 00-namespace.yaml
+  - 01-helmrepository.yaml
+  - 02-gitrepository.yaml
+  - 03-helmrelease.yaml
+  - flux-deploy-key.yaml
