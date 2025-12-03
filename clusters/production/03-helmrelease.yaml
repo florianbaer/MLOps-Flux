@@ -95,10 +95,10 @@ spec:
       resources:
         limits:
           cpu: 500m
-          memory: 512Mi
+          memory: 1Gi
         requests:
-          cpu: 100m
-          memory: 256Mi
+          cpu: 200m
+          memory: 512Mi
 
     # PostgreSQL database (using bundled chart)
     # IMPORTANT: Create secret first: kubectl create secret generic airflow-postgresql --from-literal=postgres-password=password --from-literal=password=password -n airflow
