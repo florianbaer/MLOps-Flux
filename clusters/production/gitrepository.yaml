@@ -9,7 +9,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
-  url: ssh://git@github.com/florianbaer/MLOps-ArgoCD
+  url: ssh://git@github.com/florianbaer/MLOps-Flux
   ref:
     branch: main
   secretRef:
