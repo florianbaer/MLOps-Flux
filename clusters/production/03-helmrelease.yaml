@@ -103,7 +103,7 @@ spec:
     # PostgreSQL database (using bundled chart)
     # IMPORTANT: Create secret first: kubectl create secret generic airflow-postgresql \
     #   --from-literal=postgres-password=<password> --from-literal=password=<password> -n airflow
-    postgresql:
+    postgresql: 
       enabled: true
       auth:
         enablePostgresUser: true
