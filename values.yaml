@@ -1,5 +1,5 @@
 airflow:
-  # Required for ArgoCD - disable Helm hooks
+  # Disable Helm hooks for GitOps workflow
   createUserJob:
     useHelmHooks: false
     applyCustomEnv: false
@@ -7,12 +7,12 @@ airflow:
     useHelmHooks: false
     applyCustomEnv: false
 
-  # Git-sync configuration
+  # Git-sync configuration for DAGs
   dags:
     gitSync:
       enabled: true
       repo: git@github.com:HSLU-DBIZ/JobMonitor-DAGs.git
       branch: main
       subPath: ""
-      sshKeySecret: git-ssh-secret
+      sshKeySecret: flux-git-ssh
 

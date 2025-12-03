@@ -1,0 +1,16 @@
+# Optional: GitRepository for values files
+# This is only needed if you want to reference values.yaml from Git using valuesFrom
+# If using inline values in HelmRelease, you can skip this and the flux-deploy-key secret
+
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mlops-airflow-config
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: ssh://git@github.com/florianbaer/MLOps-ArgoCD
+  ref:
+    branch: main
+  secretRef:
+    name: flux-deploy-key
