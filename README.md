@@ -79,7 +79,7 @@ Set up Flux on your cluster and configure it to watch this repository:
 ```bash
 # Set environment variables
 export GITHUB_TOKEN=<your-personal-access-token>
-export GITHUB_USER=florianbaer
+export GITHUB_USER=<your-github-username>
 
 # Verify prerequisites
 flux check --pre
@@ -99,13 +99,84 @@ flux bootstrap github \
 - Flux starts monitoring the `./clusters/production` directory
 - Automatic synchronization is enabled
 
-### Step 2: Apply the SSH Secret for DAG Sync
+### Step 2: Generate SSH Key for DAG Repository
+
+Before applying the SSH secret, you need to generate an SSH key pair and configure it as a GitHub deploy key for your DAG repository.
+
+#### 2.1 Generate SSH Key Pair
+
+```bash
+# Generate SSH key (press Enter when prompted for passphrase to leave it empty)
+ssh-keygen -t ed25519 -C "airflow-dag-sync" -f ~/.ssh/airflow_dag_key
+```
+
+This creates two files:
+- `~/.ssh/airflow_dag_key` - Private key (keep secret)
+- `~/.ssh/airflow_dag_key.pub` - Public key (add to GitHub)
+
+#### 2.2 Add Deploy Key to GitHub
+
+1. Copy your public key:
+   ```bash
+   cat ~/.ssh/airflow_dag_key.pub
+   ```
+
+2. Add it to your DAG repository on GitHub:
+   - Go to your DAG repository → **Settings** → **Deploy keys**
+   - Click **"Add deploy key"**
+   - **Title**: `Airflow GitSync`
+   - **Key**: Paste the public key content
+   - **Important**: Leave **"Allow write access"** UNCHECKED (read-only is sufficient)
+   - Click **"Add key"**
+
+For detailed instructions, see: [GitHub Deploy Keys Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys)
+
+#### 2.3 Create the Secret File
+
+**IMPORTANT**: This file contains sensitive data and must NEVER be committed to git.
+
+```bash
+# Copy the template to create your secret file
+cp secret.yaml.template secret.yaml
+
+# Verify it's ignored by git
+git status  # secret.yaml should NOT appear in untracked files
+
+# Display your private key
+cat ~/.ssh/airflow_dag_key
+```
+
+Edit `secret.yaml` and paste the entire private key output (including the BEGIN and END lines) under `gitSshKey`:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: flux-git-ssh
+  namespace: airflow
+type: Opaque
+stringData:
+  gitSshKey: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    [paste your private key here - all lines]
+    -----END OPENSSH PRIVATE KEY-----
+```
+
+**Security Check - Run before committing anything:**
+```bash
+git status  # Verify secret.yaml is NOT listed
+cat .gitignore | grep secret  # Verify secret*.yaml is in .gitignore
+```
+
+⚠️ **NEVER commit secret.yaml to git. It contains your private SSH key.**
+
+### Step 3: Apply the SSH Secret for DAG Sync
 
 The Airflow deployment needs SSH access to pull DAGs from a private Git repository.
 
 ```bash
 # Apply the SSH secret
-kubectl apply -f git-ssh-secret.yaml
+kubectl apply -f secret.yaml
 ```
 
 **Verify the secret:**
@@ -113,7 +184,7 @@ kubectl apply -f git-ssh-secret.yaml
 kubectl get secret flux-git-ssh -n airflow
 ```
 
-### Step 3: Create Required Secrets
+### Step 4: Create Required Secrets
 
 Before Airflow can deploy, you must create Kubernetes secrets for sensitive data. **These secrets are never stored in Git.**
 
@@ -148,9 +219,15 @@ kubectl get secrets -n airflow
 
 **IMPORTANT:** Save the generated passwords securely (use a password manager). You'll need them if you ever need to access the database directly or restore the secrets.
 
-### Step 4: Wait for Flux to Deploy Airflow
+### Step 5: Wait for Flux to Deploy Airflow
 
-Flux will automatically detect the manifests in `clusters/production/` and deploy them:
+Flux will automatically detect the manifests in `clusters/production/` and deploy them.
+
+**Expected Timeline:**
+- Initial deployment: 5-10 minutes
+- PostgreSQL startup: 2-3 minutes
+- Airflow webserver ready: 3-5 minutes after PostgreSQL
+- Be patient and watch the logs - multiple pod restarts during initial setup are normal
 
 ```bash
 # Watch Flux reconciliation
@@ -163,7 +240,7 @@ flux get helmreleases -n airflow
 flux get sources all
 ```
 
-### Step 5: Verify Airflow Deployment
+### Step 6: Verify Airflow Deployment
 
 ```bash
 # Check pods in airflow namespace
@@ -175,6 +252,33 @@ kubectl describe helmrelease mlops-airflow -n airflow
 # Check git-sync logs (DAG synchronization)
 kubectl logs -n airflow <scheduler-pod-name> -c git-sync
 ```
+
+### Step 7: Verify DAGs are Loaded
+
+Once Airflow is running, verify that DAGs are syncing from your Git repository:
+
+1. **Access the Airflow UI** (see "Access Airflow Web UI" section below)
+
+2. **Check for DAGs on the dashboard:**
+   - You should see DAGs from your repository listed on the main page
+   - Initial sync can take 1-2 minutes after the scheduler starts
+
+3. **Check git-sync logs to confirm synchronization:**
+   ```bash
+   SCHEDULER_POD=$(kubectl get pods -n airflow -l component=scheduler -o jsonpath='{.items[0].metadata.name}')
+   kubectl logs -n airflow $SCHEDULER_POD -c git-sync --tail=50
+   ```
+
+4. **Look for log messages indicating successful sync:**
+   ```
+   INFO: synced 3 files from origin/main
+   ```
+
+**Troubleshooting:** If DAGs don't appear:
+- Verify SSH key is correctly configured as a deploy key in GitHub
+- Check that the repository URL is correct in `clusters/production/03-helmrelease.yaml`
+- Review git-sync container logs for authentication errors
+- Ensure your DAG repository contains valid Python files with DAG definitions
 
 ## Repository Structure
 
@@ -197,6 +301,29 @@ Chart.yaml                        # Helm chart metadata (optional)
 3. HelmRelease deployed last (after dependencies exist)
 
 ## Configuration
+
+### DAG Repository Setup
+
+This setup syncs DAGs from a Git repository. For this exercise, you can use an example DAG repository or create your own.
+
+**Example DAG Repositories:**
+- https://github.com/matsudan/airflow-dag-examples - Collection of example Airflow DAGs
+- Fork the above repository to experiment with your own DAG modifications
+
+**To configure your DAG repository:**
+
+1. Choose or create a repository containing Airflow DAG files
+2. Update the repository URL in `clusters/production/03-helmrelease.yaml` (line 56):
+   ```yaml
+   dags:
+     gitSync:
+       enabled: true
+       repo: git@github.com:<your-username>/<your-dag-repo>.git
+       branch: main
+   ```
+3. Follow the SSH key setup in Step 2 to grant read access to the repository
+
+**Note**: The repository should contain Python files with Airflow DAG definitions in the root or in subdirectories.
 
 ### Airflow Configuration
 
@@ -295,6 +422,12 @@ kubectl port-forward -n airflow svc/mlops-airflow-web 8080:8080
 
 # Access at: http://localhost:8080
 ```
+
+**Default Credentials:**
+- **Username**: `admin`
+- **Password**: `admin`
+
+**Note**: For production deployments, change the default password by configuring Airflow's RBAC settings and creating custom user accounts.
 
 ## Security
 

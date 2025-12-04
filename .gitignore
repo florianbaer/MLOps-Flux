@@ -1,2 +1,5 @@
 charts/
 *.tgz
+
+# Secret files - never commit these
+secret*.yaml
